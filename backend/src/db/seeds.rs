@@ -17,11 +17,11 @@
 
 #![allow(dead_code)]
 
+use chrono::Utc;
 use sqlx::PgPool;
 use thiserror::Error;
 use tracing::{info, warn};
 use uuid::Uuid;
-use chrono::Utc;
 
 // ---------------------------------------------------------------------------
 // Error type

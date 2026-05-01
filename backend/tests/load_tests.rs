@@ -6,6 +6,6 @@
 //! ```
 
 mod load {
-    pub mod status_load;
     pub mod profile_load;
+    pub mod status_load;
 }

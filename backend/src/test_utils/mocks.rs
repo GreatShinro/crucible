@@ -1,6 +1,6 @@
+use crate::api::handlers::profiling::MetricsReport;
 use async_trait::async_trait;
 use mockall::automock;
-use crate::api::handlers::profiling::MetricsReport;
 
 /// Mockable interface for database operations.
 #[automock]
@@ -58,7 +58,8 @@ mod tests {
     #[tokio::test]
     async fn test_mock_stellar_service() {
         let mut mock_stellar = MockStellarService::new();
-        mock_stellar.expect_submit_transaction()
+        mock_stellar
+            .expect_submit_transaction()
             .with(mockall::predicate::eq("AAAA..."))
             .times(1)
             .returning(|_| Ok("tx_hash_123".to_string()));

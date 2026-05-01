@@ -5,12 +5,13 @@ use hyper::{Request, StatusCode};
 use std::sync::Arc;
 use tower::ServiceExt;
 
-use backend::api::handlers::profiling::{AppState, get_system_status};
+use backend::api::handlers::profiling::{get_system_status, AppState};
 use backend::services::{error_recovery::ErrorManager, sys_metrics::MetricsExporter};
 
 /// Build a test router with the status endpoint.
 fn build_app() -> Router {
     let state = Arc::new(AppState {
+        db: None,
         metrics_exporter: Arc::new(MetricsExporter::new()),
         error_manager: Arc::new(ErrorManager::new()),
     });

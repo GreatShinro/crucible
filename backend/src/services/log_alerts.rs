@@ -23,12 +23,12 @@
 
 #![allow(dead_code)]
 
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 use thiserror::Error;
+use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -105,16 +105,22 @@ impl AlertRule {
     /// Validate that the rule has sensible configuration values.
     pub fn validate(&self) -> Result<(), AlertError> {
         if self.name.trim().is_empty() {
-            return Err(AlertError::InvalidRule("name must not be empty".to_string()));
+            return Err(AlertError::InvalidRule(
+                "name must not be empty".to_string(),
+            ));
         }
         if self.pattern.trim().is_empty() {
-            return Err(AlertError::InvalidRule("pattern must not be empty".to_string()));
+            return Err(AlertError::InvalidRule(
+                "pattern must not be empty".to_string(),
+            ));
         }
         if self.threshold == 0 {
             return Err(AlertError::InvalidRule("threshold must be > 0".to_string()));
         }
         if self.window_secs == 0 {
-            return Err(AlertError::InvalidRule("window_secs must be > 0".to_string()));
+            return Err(AlertError::InvalidRule(
+                "window_secs must be > 0".to_string(),
+            ));
         }
         Ok(())
     }
@@ -446,7 +452,9 @@ mod tests {
         let manager = AlertManager::new();
         manager.add_rule(make_rule("ERROR", 1, 60)).await.unwrap();
 
-        manager.evaluate(&make_entry("INFO everything is fine")).await;
+        manager
+            .evaluate(&make_entry("INFO everything is fine"))
+            .await;
 
         assert!(manager.get_alerts(None).await.is_empty());
     }

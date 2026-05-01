@@ -1,8 +1,8 @@
 #![allow(dead_code)]
-use tokio::sync::mpsc;
-use tracing::{info, debug};
-use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
+use tracing::{debug, info};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogEntry {
@@ -59,9 +59,12 @@ mod tests {
     #[tokio::test]
     async fn test_log_aggregation() {
         let (aggregator, mut receiver) = LogAggregator::new();
-        
-        aggregator.log("INFO", "Test message", "test_service").await.unwrap();
-        
+
+        aggregator
+            .log("INFO", "Test message", "test_service")
+            .await
+            .unwrap();
+
         let entry = receiver.recv().await.unwrap();
         assert_eq!(entry.level, "INFO");
         assert_eq!(entry.message, "Test message");

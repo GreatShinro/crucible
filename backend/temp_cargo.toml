@@ -32,16 +32,11 @@ validator = { version = "0.19", features = ["derive"] }
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 tower_governor = "0.4"
 mockall = { version = "0.13", optional = true }
-opentelemetry = { version = "0.31", features = ["trace"] }
-opentelemetry_sdk = { version = "0.31", features = ["trace", "rt-tokio"] }
-opentelemetry-otlp = { version = "0.31", default-features = false, features = ["trace", "http-proto", "reqwest-client"] }
-tracing-opentelemetry = { version = "0.32", default-features = false }
-futures-util = { version = "0.3", default-features = false, features = ["std"] }
 # OpenTelemetry and tracing instrumentation
 opentelemetry = { version = "0.24", features = ["trace", "metrics"] }
 opentelemetry-otlp = { version = "0.17", features = ["trace", "grpc-tonic"] }
 opentelemetry-semantic-conventions = "0.16"
-opentelemetry_sdk = { version = "0.24", features = ["trace", "rt-tokio"] }
+opentelemetry-sdk = { version = "0.24", features = ["trace", "rt-tokio"] }
 tracing-opentelemetry = "0.25"
 tonic = "0.12"
 
@@ -52,11 +47,7 @@ rust_decimal_macros = "1.35"
 criterion = { version = "0.5", features = ["async_tokio"] }
 hyper = { version = "1.0", features = ["full"] }
 mime = "0.3"
-mockall = "0.13"
-mockall = "0.12"
 
 [[bench]]
 name = "performance"
 harness = false
-
-

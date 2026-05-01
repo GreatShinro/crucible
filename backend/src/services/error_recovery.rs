@@ -1,9 +1,13 @@
 #![allow(dead_code)]
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use thiserror::Error;
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
+use tracing::{error, info, warn, instrument};
 use thiserror::Error;
 use serde::{Serialize, Deserialize};
+use crate::services::tracing::TracingService;
 
 #[derive(Error, Debug, Serialize, Deserialize)]
 pub enum RecoveryError {
@@ -29,6 +33,12 @@ pub struct ErrorManager {
     tasks: Arc<RwLock<Vec<RecoveryTask>>>,
 }
 
+impl Default for ErrorManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ErrorManager {
     pub fn new() -> Self {
         Self {
@@ -36,7 +46,16 @@ impl ErrorManager {
         }
     }
 
+    pub async fn handle_error(
+        &self,
+        error: RecoveryError,
+        task_name: &str,
+    ) -> Result<(), RecoveryError> {
+    #[instrument(skip(self), fields(service.name = "ErrorManager", service.method = "handle_error"))]
     pub async fn handle_error(&self, error: RecoveryError, task_name: &str) -> Result<(), RecoveryError> {
+        let span = TracingService::service_method_span("ErrorManager", "handle_error");
+        let _enter = span.enter();
+        
         warn!(task = %task_name, error = %error, "Handling error");
 
         let mut tasks = self.tasks.write().await;
@@ -44,6 +63,7 @@ impl ErrorManager {
             task.retries += 1;
             if task.retries > task.max_retries {
                 error!(task = %task_name, "Max retries reached");
+                TracingService::record_error(&span, &format!("Max retries reached for {}", task_name), "max_retries");
                 return Err(RecoveryError::MaxRetriesReached(task_name.to_string()));
             }
             info!(task = %task_name, retry = task.retries, "Retrying task");
@@ -60,7 +80,11 @@ impl ErrorManager {
         Ok(())
     }
 
+    #[instrument(skip(self), fields(service.name = "ErrorManager", service.method = "get_active_tasks"))]
     pub async fn get_active_tasks(&self) -> Vec<RecoveryTask> {
+        let span = TracingService::service_method_span("ErrorManager", "get_active_tasks");
+        let _enter = span.enter();
+        
         self.tasks.read().await.clone()
     }
 }
@@ -75,20 +99,34 @@ mod tests {
         let task_name = "test_task";
 
         // First failure
-        manager.handle_error(RecoveryError::Database("connection lost".to_string()), task_name).await.unwrap();
+        manager
+            .handle_error(
+                RecoveryError::Database("connection lost".to_string()),
+                task_name,
+            )
+            .await
+            .unwrap();
         assert_eq!(manager.get_active_tasks().await.len(), 1);
         assert_eq!(manager.get_active_tasks().await[0].retries, 1);
 
         // Second failure
-        manager.handle_error(RecoveryError::Redis("timeout".to_string()), task_name).await.unwrap();
+        manager
+            .handle_error(RecoveryError::Redis("timeout".to_string()), task_name)
+            .await
+            .unwrap();
         assert_eq!(manager.get_active_tasks().await[0].retries, 2);
 
         // Third failure
-        manager.handle_error(RecoveryError::Internal("unknown".to_string()), task_name).await.unwrap();
+        manager
+            .handle_error(RecoveryError::Internal("unknown".to_string()), task_name)
+            .await
+            .unwrap();
         assert_eq!(manager.get_active_tasks().await[0].retries, 3);
 
         // Fourth failure - should fail
-        let result = manager.handle_error(RecoveryError::Internal("last straw".to_string()), task_name).await;
+        let result = manager
+            .handle_error(RecoveryError::Internal("last straw".to_string()), task_name)
+            .await;
         assert!(matches!(result, Err(RecoveryError::MaxRetriesReached(_))));
     }
 }

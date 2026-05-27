@@ -400,6 +400,7 @@ The backend runs several background workers for system health and data consisten
 | Name | Description |
 |---|---|
 | `logging` | Captures request/response metadata, latency, and status codes; integrated with `tracing` and `log_aggregator` |
+| `permissions` | Role-based access control (RBAC) with PostgreSQL storage and Redis caching for permission checks |
 
 ### Binaries (`src/bin/`)
 
@@ -1141,3 +1142,91 @@ impl Validate for ProfileTriggerRequest {
 - `src/jobs/` – Background job definitions (Apalis)
 - `src/services/` – Business logic and external integrations
 - `src/telemetry/` – Observability and logging setup
+
+
+## Permissions & RBAC
+
+The backend implements role-based access control (RBAC) with three built-in roles and fine-grained permission management.
+
+### Roles
+
+| Role | Description |
+|---|---|
+| `admin` | Full system access, can manage all resources and permissions |
+| `user` | Standard user with limited permissions |
+| `guest` | Read-only access to public resources |
+
+### Permission System
+
+Permissions are defined as `(resource, action)` pairs stored in PostgreSQL and cached in Redis:
+
+```rust
+use backend::api::middleware::permissions::{Permission, PermissionChecker};
+
+let checker = PermissionChecker::new(db, redis);
+let permission = Permission::new("contracts", "read");
+
+if checker.has_permission(user_id, &permission).await? {
+    // User has permission
+}
+```
+
+### Default Permissions
+
+| Resource | Actions | Description |
+|---|---|---|
+| `contracts` | `read`, `write`, `delete` | Smart contract management |
+| `test_runs` | `read`, `write`, `delete` | Test execution management |
+| `users` | `read`, `write`, `delete` | User management |
+| `permissions` | `manage` | Permission assignment |
+
+### Using Permission Middleware
+
+```rust
+use axum::{routing::get, Router};
+use backend::api::middleware::permissions::require_permission;
+
+let app = Router::new()
+    .route("/contracts", get(list_contracts))
+    .layer(axum::middleware::from_fn_with_state(
+        state.clone(),
+        require_permission("contracts", "read")
+    ));
+```
+
+### Caching Strategy
+
+Permission checks are cached in Redis with a 5-minute TTL:
+
+- Cache key format: `perm:{user_id}:{resource}:{action}`
+- Role cache: `role:{user_id}`
+- Automatic invalidation on permission changes via `invalidate_cache(user_id)`
+
+### Managing Permissions
+
+```sql
+-- Grant permission to user
+INSERT INTO user_permissions (user_id, permission_id)
+SELECT 123, id FROM permissions 
+WHERE resource = 'contracts' AND action = 'write';
+
+-- Revoke permission
+DELETE FROM user_permissions 
+WHERE user_id = 123 
+  AND permission_id = (SELECT id FROM permissions WHERE resource = 'contracts' AND action = 'write');
+
+-- List user permissions
+SELECT p.resource, p.action, p.description
+FROM user_permissions up
+JOIN permissions p ON up.permission_id = p.id
+WHERE up.user_id = 123;
+```
+
+### Database Schema
+
+Run migration `20260430000000_permissions.sql` to set up:
+
+- `user_role` enum type (`admin`, `user`, `guest`)
+- `permissions` table with resource/action pairs
+- `user_permissions` junction table
+- Indexes for performance optimization

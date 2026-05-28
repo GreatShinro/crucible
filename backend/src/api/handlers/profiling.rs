@@ -161,7 +161,7 @@ pub async fn get_health(
         "Health check completed"
     );
 
-    Ok(Json(response))
+    Ok(Json(response));
 }
 
 /// Handler for Prometheus-compatible metrics.
@@ -171,22 +171,13 @@ pub async fn get_prometheus_metrics() -> impl IntoResponse {
     let _enter = span.enter();
     
     info!("Exporting Prometheus-format metrics");
-    
-    "# HELP backend_requests_total Total number of requests\n\
-                   # TYPE backend_requests_total counter\n\
-                   backend_requests_total 1024\n\
-                   # HELP backend_ledger_latency_ms Current ledger ingestion latency\n\
-                   # TYPE backend_ledger_latency_ms gauge\n\
-                   backend_ledger_latency_ms 120\n"
-        .to_string()
-}
-
-pub async fn get_system_status(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-     # TYPE backend_requests_total counter\n\
-     backend_requests_total 1024\n\
-     # HELP backend_ledger_latency_ms Current ledger ingestion latency\n\
-     # TYPE backend_ledger_latency_ms gauge\n\
-     backend_ledger_latency_ms 120\n".to_string()
+    let metrics = "# HELP backend_requests_total Total number of requests\n\
+# TYPE backend_requests_total counter\n\
+backend_requests_total 1024\n\
+# HELP backend_ledger_latency_ms Current ledger ingestion latency\n\
+# TYPE backend_ledger_latency_ms gauge\n\
+backend_ledger_latency_ms 120\n";
+    metrics.to_string()
 }
 
 /// Handler for detailed system status
@@ -194,7 +185,6 @@ pub async fn get_system_status(State(state): State<Arc<AppState>>) -> impl IntoR
 pub async fn get_system_status(
     State(state): State<Arc<AppState>>,
 ) -> ApiResponse<SystemStatus> {
-) -> impl IntoResponse {
     let span = info_span!("system.status");
     let _enter = span.enter();
     
@@ -223,7 +213,6 @@ pub async fn get_system_status(
     }))
 }
 
-pub async fn trigger_profile_collection(State(_state): State<Arc<AppState>>) -> impl IntoResponse {
 /// Handler to trigger profile collection (CPU, memory profiling)
 #[instrument(skip_all, fields(http.method = "POST", http.route = "/api/profile"))]
 pub async fn trigger_profile_collection(
@@ -238,20 +227,4 @@ pub async fn trigger_profile_collection(
         message: format!("Profiling collection triggered for label: {}", payload.label),
         estimated_completion: chrono::Utc::now() + chrono::Duration::seconds(payload.duration_secs as i64),
     })
-) -> impl IntoResponse {
-    let span = info_span!("profiling.collection");
-    let _enter = span.enter();
-    
-    let profile_id = uuid::Uuid::new_v4().to_string();
-    
-    info!(
-        profile_id = %profile_id,
-        "Profiling collection triggered"
-    );
-    
-    // In a real implementation, this would trigger a CPU/Memory profile
-    Json(serde_json::json!({
-        "message": "Profiling collection triggered",
-        "profile_id": profile_id,
-    }))
 }

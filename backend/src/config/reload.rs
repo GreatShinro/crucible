@@ -80,18 +80,12 @@ pub async fn handle_reload(
 pub async fn handle_get_config(
     State(manager): State<Arc<ConfigManager>>,
 ) -> impl IntoResponse {
-<<<<<<< HEAD
     let config = manager.load();
     // Sensitive fields are already skipped or redacted by `serde(skip_serializing)` and custom `Debug`.
     // In this case, `AppConfig` derives Serialize, and sensitive fields have `#[serde(skip_serializing)]`.
     Json(config.as_ref().clone())
-=======
-    let config = state.config_manager.load();
-    // In a real app, we would sanitize sensitive fields like DB passwords
-    Json(config)
 }
 
-/// Configuration hot-reload.
 //
 // This module provides [`ConfigWatcher`], which holds the live [`AppConfig`]
 // behind an `Arc<RwLock<_>>` and can reload it at any time — either

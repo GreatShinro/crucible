@@ -2,7 +2,6 @@
 
 High-performance Rust backend for the Crucible smart contract testing platform, providing performance profiling, mock service layers, specialized serialization utilities, and robust background monitoring.
 
-<<<<<<< HEAD
 ## 🚀 Tech Stack
 - **Web Framework**: Axum (async Rust)
 - **Runtime**: Tokio
@@ -10,7 +9,6 @@ High-performance Rust backend for the Crucible smart contract testing platform, 
 - **Caching & Jobs**: Redis (via Apalis)
 - **Observability**: OpenTelemetry + Tracing
 - **API Documentation**: Utoipa (Swagger UI)
-=======
 ## Technical Stack
 - **Axum**: High-performance web framework.
 - **SQLx**: Async PostgreSQL driver with compile-time checked queries.
@@ -61,7 +59,6 @@ CREATE TABLE log_alerts (
 );
 ```
 > Production-ready API server for the Crucible smart contract testing platform, built with Rust, Axum, PostgreSQL, and Redis.
->>>>>>> origin/main
 
 ---
 
@@ -117,9 +114,7 @@ This application uses a layered configuration system. Base values and environmen
 
 ### Environment Variables
 
-<<<<<<< HEAD
 | Variable | Default | Required in Prod? | Description |
-=======
 ## Project Structure
 
 ```
@@ -604,7 +599,6 @@ http.request (GET /api/v1/profiling/health)
 Benchmarked on a 4-core system with 8GB RAM:
 
 | Metric | Without Tracing | With Tracing | Overhead |
->>>>>>> origin/main
 |---|---|---|---|
 | `APP_ENV` | `development` | Yes | `development`, `staging`, or `production` |
 | `APP_SERVER__PORT` | (from TOML) | No | HTTP server listen port. |
@@ -713,7 +707,6 @@ impl JobHandler for MyJob {
     }
 }
 ```
-<<<<<<< HEAD
 
 ### Built-in Jobs
 
@@ -775,7 +768,6 @@ async fn test_create_resource() {
 
 ## 📄 License
 MIT — see [LICENSE](../LICENSE) for details.
-=======
 ## Structure
 - `src/api/` – API handlers and routing
 - `src/config/` – Environment configuration
@@ -783,4 +775,3 @@ MIT — see [LICENSE](../LICENSE) for details.
 - `src/jobs/` – Background job definitions (Apalis)
 - `src/services/` – Business logic and external integrations
 - `src/telemetry/` – Observability and logging setup
->>>>>>> origin/main

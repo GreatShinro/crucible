@@ -8,3 +8,5 @@ pub mod feature_flags;
 pub mod log_aggregator;
 pub mod sys_metrics;
 pub mod tracing;
+pub mod compilation;
+pub mod dependency_analyzer;

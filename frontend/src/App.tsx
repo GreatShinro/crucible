@@ -1,4 +1,4 @@
-import { GasCostEstimator } from './components/GasCostEstimator';
+import { EventListenerDashboard } from './components/EventListenerDashboard';
 import './App.css';
 
 function App() {
@@ -10,7 +10,7 @@ function App() {
       </header>
       
       <main className="app-main">
-        <GasCostEstimator />
+        <EventListenerDashboard />
       </main>
     </div>
   );

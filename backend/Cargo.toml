@@ -11,9 +11,6 @@ publish = false
 name = "backend"
 path = "src/main.rs"
 
-[[bin]]
-name = "backup"
-path = "src/bin/backup.rs"
 
 [features]
 default = []
@@ -33,6 +30,10 @@ testutils = ["mockall"]
 # Web framework & HTTP
 axum = { version = "0.7", features = ["macros"] }
 tower = { version = "0.5", features = ["util"] }
+url = { version = "2", features = ["serde"] }
+# Web framework
+axum = { version = "0.7", features = ["macros", "ws"] }
+tower = { version = "0.5", features = ["full", "util"] }
 tower-http = { version = "0.5", features = ["cors", "trace", "compression-gzip", "request-id"] }
 tower_governor = "0.4"
 
@@ -196,6 +197,26 @@ chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
 thiserror = "1.0"
 anyhow = "1.0"
+config = "0.14.0"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+
+# External Integrations
+utoipa = { version = "5.0", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "8.0", features = ["axum"] }
+apalis = { version = "0.6" }
+apalis-redis = "0.6"
+rust_decimal = { version = "1.35", features = ["serde"] }
+stellar-xdr = { version = "21.0", features = ["std"] }
+base64 = "0.22"
+soroban-sdk = { workspace = true, features = ["testutils", "alloc"] }
+validator = { version = "0.19", features = ["derive"] }
+tower_governor = "0.4"
+mockall = { version = "0.13", optional = true }
+tonic = "0.12"
+
+# Scheduler
+tokio-util = "0.7"
+cron = "0.12"
 async-trait = "0.1"
 arc-swap = "1.7"
 base64 = "0.22"
@@ -241,3 +262,7 @@ opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
+
+[[bin]]
+name = "backup"
+path = "src/bin/backup.rs"

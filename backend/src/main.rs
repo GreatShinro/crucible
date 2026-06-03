@@ -9,6 +9,7 @@ use axum::{
 use backend::api::handlers::dashboard::{get_dashboard, DashboardState, get_dashboard_metrics, get_contract_stats};
 use backend::{
     api::handlers::{profiling, stellar, dashboard},
+    api::handlers::{dashboard, errors, profiling, sandbox, stellar},
     api::middleware::logging::logging_middleware,
     config::{Config, AppConfig, reload::{ConfigManager, handle_reload, handle_get_config}},
     jobs::{monitor_transaction, TransactionMonitorJob},
@@ -18,6 +19,7 @@ use backend::{
         error_recovery::ErrorManager,
         log_aggregator::LogAggregator,
         log_alerts::AlertManager,
+        sandbox::ContractSandboxService,
         sys_metrics::MetricsExporter,
         tracing::{TracingService, TracingConfig},
     },
@@ -26,6 +28,7 @@ use backend::services::audit;
 use profiling::AppState;
 use redis::aio::ConnectionManager;
 use sqlx::postgres::PgPoolOptions;
+use redis::Client as RedisClient;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::signal;
@@ -86,6 +89,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let alert_manager = Arc::new(AlertManager::new());
     let (log_aggregator, log_receiver) = LogAggregator::new();
     let log_aggregator = Arc::new(log_aggregator);
+    let sandbox_service = Arc::new(ContractSandboxService::default());
 
     tokio::spawn(MetricsExporter::run_collector(metrics_exporter.clone()));
     tokio::spawn(LogAggregator::run_worker(log_receiver));
@@ -100,6 +104,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let _redis_enter = redis_span.enter();
     
     let redis_conn_dashboard = ConnectionManager::new(redis_client.clone()).await?;
+
     let storage: RedisStorage<TransactionMonitorJob> = RedisStorage::new(conn);
 
     tracing::info!("Redis connection established");
@@ -116,6 +121,15 @@ async fn main() -> Result<(), anyhow::Error> {
         error_manager: error_manager.clone(),
         config_manager: config_manager.clone(),
         log_aggregator: log_aggregator.clone(),
+        redis: redis_client.clone(),
+    });
+
+    // Create dashboard state
+    let dashboard_state = Arc::new(DashboardState {
+        metrics_exporter,
+        error_manager,
+        alert_manager,
+        db: db_pool.clone(),
         redis: redis_client.clone(),
     });
 
@@ -182,6 +196,12 @@ async fn main() -> Result<(), anyhow::Error> {
                 .route("/api/config", get(handle_get_config))
                 .route("/api/config/reload", post(handle_reload))
                 .with_state(config_manager.clone()),
+        .route(
+            "/api/config",
+            get(handle_get_config).with_state(config_manager.clone()),
+        )
+            "/api/config/reload",
+            post(handle_reload).with_state(config_manager.clone()),
         )
         .nest(
             "/api/v1/profiling",
@@ -214,6 +234,43 @@ async fn main() -> Result<(), anyhow::Error> {
         )
             "/api/v1/errors",
             errors::error_analytics_routes(db_pool.clone(), redis_conn_dashboard.clone())
+            "/api/v1/contracts",
+            Router::new()
+                .route(
+                    "/compile",
+                    post(backend::api::handlers::contracts::compile_contract),
+                )
+                    "/analyze-dependencies",
+                    post(backend::api::handlers::contracts::analyze_dependencies),
+                )
+                    "/compliance-check",
+                    post(backend::api::handlers::contracts::check_compliance),
+                )
+                    "/logs",
+                    post(backend::api::handlers::contracts::log_contract_call),
+                )
+                    get(backend::api::handlers::contracts::get_contract_logs),
+                )
+                    "/templates",
+                    get(backend::api::handlers::contracts::get_templates),
+                )
+                .with_state(state.clone()),
+        )
+        .route(
+            "/api/v1/networks",
+            get(backend::api::handlers::contracts::get_networks),
+        )
+        .nest(
+            "/api/v1/admin",
+                .route("/system-stats", get(backend::api::handlers::admin::get_system_stats))
+                .route("/maintenance", post(backend::api::handlers::admin::set_maintenance_mode))
+                .route("/logs", get(backend::api::handlers::admin::get_admin_logs))
+        )
+            errors::error_analytics_routes(db_pool.clone(), redis_client.clone()),
+        )
+        .nest("/api/v1/sandbox", sandbox::routes(sandbox_service))
+            "/api/v1/ws/dashboard",
+            get(ws_dashboard_handler).with_state(ws_state),
         )
         .route("/api/dashboard", get(get_dashboard))
         .with_state(dashboard_state)
@@ -272,6 +329,9 @@ async fn main() -> Result<(), anyhow::Error> {
             // Close Redis connection
             tracing::info!("Closing Redis connection");
             drop(state.redis.clone()); // Drop this handle; other shared handles close when released.
+            if let Some(pool) = &state.db {
+                pool.close().await;
+            }
 
             tracing::info!("Graceful shutdown completed successfully");
 

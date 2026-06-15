@@ -57,7 +57,7 @@ opentelemetry_sdk = { version = "0.31", features = ["trace", "rt-tokio"] }
 opentelemetry-otlp = { version = "0.31", default-features = false, features = ["trace", "http-proto", "reqwest-client"] }
 tracing-opentelemetry = { version = "0.32", default-features = false }
 opentelemetry-semantic-conventions = "0.16"
-tonic = "0.12"
+tonic = "0.14"
 
 # Utilities
 uuid = { version = "1.0", features = ["v4", "serde"] }

@@ -2,7 +2,7 @@
 #![allow(deprecated)]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, Address,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short, token, Address,
     Env, Map, Symbol, Vec,
 };
 
@@ -50,14 +50,18 @@ impl Treasury {
     }
 
     /// Deposit an amount of a given token (use Address::from([0;32]) for native XLM).
-    pub fn deposit(env: Env, token: Address, amount: i128) {
-        // Since invoker() is removed in modern Soroban SDK, we assign deposits to the first admin
-        let admins: Vec<Address> = env.storage().instance().get(&DataKey::Admins).unwrap();
-        let depositor = admins.get(0).unwrap();
+    pub fn deposit(env: Env, depositor: Address, token: Address, amount: i128) {
+        // Ensure the depositor authorized this operation
+        depositor.require_auth();
 
+        // Perform actual token transfer from depositor to this contract (treasury)
+        token::Client::new(&env, &token).transfer(&depositor, &env.current_contract_address(), &amount);
+
+        // Update internal accounting only after successful transfer
         let mut balances: Map<(Address, Address), i128> =
             env.storage().instance().get(&DataKey::Balances).unwrap();
-        let key = (depositor.clone(), token.clone());
+        let treasury_addr = env.current_contract_address();
+        let key = (treasury_addr.clone(), token.clone());
         let current = balances.get(key.clone()).unwrap_or(0);
         let new_balance = current + amount;
         if new_balance < 0 {

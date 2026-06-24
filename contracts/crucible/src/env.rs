@@ -118,6 +118,39 @@ pub struct MockEnv {
     track_costs: bool,
 }
 
+// Typed event wrapper to provide ergonomic access to event fields and typed data conversion.
+#[derive(Clone, Debug)]
+pub struct CapturedEvent {
+    env: Env,
+    pub contract: Address,
+    pub topics: SorobanVec<Val>,
+    pub data: Val,
+}
+
+impl CapturedEvent {
+    /// Returns the contract address that emitted the event.
+    pub fn contract(&self) -> Address {
+        self.contract.clone()
+    }
+
+    /// Returns the raw topics as a SorobanVec<Val>.
+    pub fn topics(&self) -> SorobanVec<Val> {
+        self.topics.clone()
+    }
+
+    /// Returns the raw data value.
+    pub fn data_raw(&self) -> Val {
+        self.data.clone()
+    }
+
+    /// Convert the event data into a typed Rust value using Soroban's FromVal.
+    ///
+    /// Example: let amount: i128 = ev.data_as();
+    pub fn data_as<T: FromVal<Env>>(&self) -> T {
+        T::from_val(&self.env, &self.data)
+    }
+}
+
 impl MockEnv {
     /// Returns the underlying `soroban_sdk::Env`.
     pub fn inner(&self) -> &Env {
@@ -273,6 +306,50 @@ impl MockEnv {
             }
         }
         matching
+    }
+
+    /// Returns events matching the given topics as typed CapturedEvent wrappers.
+    ///
+    /// This keeps the low-level `events_matching` available for advanced users but
+    /// provides an ergonomic path to convert event data into Rust types.
+    pub fn events_parsed<T>(&self, topics: T) -> std::vec::Vec<CapturedEvent>
+    where
+        T: IntoVal<Env, SorobanVec<Val>>,
+    {
+        let filter_topics: SorobanVec<Val> = topics.into_val(&self.inner);
+        let all_events = self.inner.events().all();
+        let mut parsed = Vec::new();
+
+        // We use the internal representation for filtering in this helper
+        use soroban_sdk::xdr::{self, ScAddress};
+        for event in all_events.events() {
+            let xdr::ContractEventBody::V0(body) = &event.body;
+            let event_topics: SorobanVec<Val> = body.topics.clone().into_val(&self.inner);
+            if event_topics.len() < filter_topics.len() {
+                continue;
+            }
+            let mut matches = true;
+            for (i, filter_topic) in filter_topics.iter().enumerate() {
+                if format!("{:?}", filter_topic)
+                    != format!("{:?}", event_topics.get(i as u32).unwrap())
+                {
+                    matches = false;
+                    break;
+                }
+            }
+            if matches {
+                let sc_addr = ScAddress::Contract(event.contract_id.as_ref().unwrap().clone());
+                let contract_id = Address::from_val(&self.inner, &sc_addr);
+                let data: Val = body.data.clone().into_val(&self.inner);
+                parsed.push(CapturedEvent {
+                    env: self.inner.clone(),
+                    contract: contract_id,
+                    topics: event_topics,
+                    data,
+                });
+            }
+        }
+        parsed
     }
 
     /// Set the XLM token address for the environment.

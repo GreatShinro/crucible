@@ -18,10 +18,12 @@ mod tests {
         let admin2 = env.account("admin2");
         let admins = Vec::from_array(&env, &[admin1.address(), admin2.address()]);
         Treasury::initialize(env.inner(), admins.clone(), 2);
-        // verify stored admins and quorum via balance query (no direct getter, rely on no panic)
-        // deposit by any user should work
-        Treasury::deposit(env.inner(), Address::from([0; 32]), 1_000);
-        let bal = Treasury::balance_of(env.inner(), admin1.address(), Address::from([0; 32]));
+        // prepare a token and fund depositor
+        let token = MockToken::xlm(&env);
+        token.mint(&admin1.address(), 1_000);
+        // deposit by admin1
+        Treasury::deposit(env.inner(), admin1.address(), token.address(), 1_000);
+        let bal = Treasury::balance_of(env.inner(), env.current_contract_address(), token.address());
         assert_eq!(bal, 1_000);
     }
 
@@ -33,12 +35,14 @@ mod tests {
         let admin2 = env.account("admin2");
         let admins = Vec::from_array(&env, &[admin1.address(), admin2.address()]);
         Treasury::initialize(env.inner(), admins.clone(), 2);
-        Treasury::deposit(env.inner(), Address::from([0; 32]), 1_000);
+        let token = MockToken::xlm(&env);
+        token.mint(&admin1.address(), 1_000);
+        Treasury::deposit(env.inner(), admin1.address(), token.address(), 1_000);
         // attempt withdraw with only one signer
         Treasury::withdraw(
             env.inner(),
             admin1.address(),
-            Address::from([0; 32]),
+            token.address(),
             500,
             Vec::from_array(&env, &[admin1.address()]),
         );
@@ -51,16 +55,18 @@ mod tests {
         let admin2 = env.account("admin2");
         let admins = Vec::from_array(&env, &[admin1.address(), admin2.address()]);
         Treasury::initialize(env.inner(), admins.clone(), 2);
-        Treasury::deposit(env.inner(), Address::from([0; 32]), 1_000);
+        let token = MockToken::xlm(&env);
+        token.mint(&admin1.address(), 1_000);
+        Treasury::deposit(env.inner(), admin1.address(), token.address(), 1_000);
         // withdraw with both admins
         Treasury::withdraw(
             env.inner(),
             admin1.address(),
-            Address::from([0; 32]),
+            token.address(),
             400,
             Vec::from_array(&env, &[admin1.address(), admin2.address()]),
         );
-        let bal = Treasury::balance_of(env.inner(), admin1.address(), Address::from([0; 32]));
+        let bal = Treasury::balance_of(env.inner(), env.current_contract_address(), token.address());
         assert_eq!(bal, 600);
     }
 }

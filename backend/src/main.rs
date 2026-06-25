@@ -1,3 +1,5 @@
+use std::{net::SocketAddr, sync::Arc};
+
 use apalis::prelude::*;
 use apalis_redis::RedisStorage;
 use axum::{
@@ -58,11 +60,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .unwrap_or_else(|| "http://localhost:4318/v1/traces".to_string()),
     );
 
-    let _tracing_guard = TracingService::init_with_filter(
-        tracing_config,
-        Some(&config.observability.log_level),
-        config.observability.json_logs(env),
-    )?;
+    let _tracing_guard = TracingService::init(tracing_config)?;
 
     let _enter = info_span!("app.startup").entered();
 
@@ -134,8 +132,29 @@ async fn main() -> Result<(), anyhow::Error> {
             (name = "profiling", description = "Performance and health monitoring endpoints"),
             (name = "dashboard", description = "Dashboard metrics and analytics endpoints")
         )
-    )]
-    struct ApiDoc;
+        .route("/compliance-check", post(contracts::check_compliance))
+        .route(
+            "/logs",
+            post(contracts::log_contract_call).get(contracts::get_contract_logs),
+        )
+        .route("/upgrade-plan", post(contracts::create_upgrade_plan))
+        .route("/templates", get(contracts::get_templates));
+
+    let coverage_router = Router::new()
+        .route("/", post(coverage::submit_coverage))
+        .route("/:project", get(coverage::get_latest_coverage))
+        .with_state(coverage_state);
+
+    let admin_router = Router::new()
+        .route(
+            "/system-stats",
+            get(backend::api::handlers::admin::get_system_stats),
+        )
+        .route(
+            "/maintenance",
+            post(backend::api::handlers::admin::set_maintenance_mode),
+        )
+        .route("/logs", get(backend::api::handlers::admin::get_admin_logs));
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -211,6 +230,9 @@ async fn main() -> Result<(), anyhow::Error> {
             "/api/v1/errors",
             errors::error_analytics_routes(db_pool.clone(), redis_client.clone()),
         )
+        .nest("/api/v1/contracts", contracts_router)
+        .route("/api/v1/networks", get(contracts::get_networks))
+        .nest("/api/v1/admin", admin_router)
         .nest("/api/v1/sandbox", sandbox::routes(sandbox_service))
         .nest(
             "/api/v1/coverage",

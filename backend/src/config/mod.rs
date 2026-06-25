@@ -4,6 +4,9 @@
 //! overrides are passed securely via environment variables. This prevents environment variable sprawl,
 //! ensures typed nested structures, and makes local development frictionless without compromising
 //! production security.
+//!
+//! - [`AppConfig`] — hot-reloadable runtime configuration, loaded via the layered config crate.
+//! - [`reload`] — [`ConfigManager`] and Axum handlers for live config updates.
 
 use config::{Config, Environment as ConfigEnvironment, File, FileFormat};
 use serde::{Deserialize, Serialize};
@@ -24,6 +27,9 @@ pub use error::ConfigError;
 pub use observability::ObservabilityConfig;
 pub use redis::RedisConfig;
 pub use server::ServerConfig;
+
+use config::{Config as ConfigBuilder, Environment as ConfigEnvironment, File, FileFormat};
+use serde::{Deserialize, Serialize};
 
 /// The execution environment of the application.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -110,7 +116,7 @@ impl AppConfig {
             Environment::Production => include_str!("defaults/production.toml"),
         };
 
-        let builder = Config::builder()
+        let builder = ConfigBuilder::builder()
             // 1. Base configuration defaults
             .add_source(File::from_str(default_config, FileFormat::Toml))
             // 2. Environment-specific overrides

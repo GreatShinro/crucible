@@ -20,13 +20,12 @@ use opentelemetry_sdk::Resource;
 use opentelemetry_semantic_conventions::resource;
 use std::time::Duration;
 use tracing::{info_span, warn};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 
 /// Central tracing service for initialization and span creation
 pub struct TracingService;
 
 /// Keeps the OpenTelemetry provider alive and flushes spans during shutdown.
-#[derive(Debug)]
 pub struct TracingGuard {
     tracer_provider: SdkTracerProvider,
 }
@@ -310,7 +309,7 @@ mod tests {
     #[test]
     fn test_db_span_creation() {
         let span = TracingService::db_query_span(
-            "SELECT * FROM users WHERE id = $1",
+            "SELECT * FROM users WHERE id = ",
             "postgres",
             "SELECT",
         );

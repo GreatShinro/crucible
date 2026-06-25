@@ -5,12 +5,9 @@
 //! cache hit rates, and system resource usage. The service uses PostgreSQL for durability
 //! and Redis for high-performance caching.
 
-use chrono::{DateTime, Utc};
-use tracing::{info, debug, warn, error, instrument};
-//! System metrics and build metrics services.
-
 #![allow(dead_code)]
 
+use chrono::{DateTime, Utc};
 use redis::{AsyncCommands, Client as RedisClient};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -18,13 +15,8 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
-use tracing::{debug, info, instrument};
+use tracing::{debug, info, instrument, warn, error};
 use uuid::Uuid;
-use rust_decimal::Decimal;
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use crate::services::tracing::TracingService;
-
 use crate::services::tracing::TracingService;
 
 // ---------------------------------------------------------------------------
@@ -174,7 +166,7 @@ impl BuildMetricsService {
         Ok(id)
     }
 
-    /// Get metrics for a specific project.
+        /// Get metrics for a specific project.
     pub async fn get_project_metrics(
         &self,
         project_name: &str,
@@ -208,9 +200,9 @@ impl BuildMetricsService {
             SELECT id, project_name, build_id, build_status, compilation_time_ms,
                    dependency_count, cache_hit_rate, cpu_usage, memory_usage_mb, build_timestamp
             FROM build_metrics
-            WHERE project_name = $1
+            WHERE project_name = 
             ORDER BY build_timestamp DESC
-            LIMIT $2
+            LIMIT 
             "#,
         )
         .bind(project_name)
@@ -266,12 +258,12 @@ impl BuildMetricsService {
             r#"
             SELECT
                 COUNT(*) as total_builds,
-                SUM(CASE WHEN build_status = 'success' THEN 1 ELSE 0 END) as successful_builds,
-                SUM(CASE WHEN build_status = 'failed' THEN 1 ELSE 0 END) as failed_builds,
+                SUM(CASE WHEN build_status = 'success' THEN 1 ELSE 0 END)::int8 as successful_builds,
+                SUM(CASE WHEN build_status = 'failed' THEN 1 ELSE 0 END)::int8 as failed_builds,
                 AVG(compilation_time_ms)::float8 as avg_compilation_time,
                 AVG(cache_hit_rate)::float8 as avg_cache_hit_rate
             FROM build_metrics
-            WHERE project_name = $1
+            WHERE project_name = 
             "#,
         )
         .bind(project_name)
@@ -331,14 +323,14 @@ impl BuildMetricsService {
                    dependency_count, cache_hit_rate, cpu_usage, memory_usage_mb, build_timestamp
             FROM build_metrics
             ORDER BY build_timestamp DESC
-            LIMIT $1
+            LIMIT 
             "#,
         )
         .bind(limit)
         .fetch_all(&self.db)
         .await?;
 
-        Ok(rows
+        let metrics = rows
             .into_iter()
             .map(
                 |(
@@ -369,7 +361,7 @@ impl BuildMetricsService {
             .collect())
     }
 
-    /// Delete all metrics for a project.
+/// Delete all metrics for a project.
     pub async fn delete_project_metrics(&self, project_name: &str) -> Result<u64, MetricsError> {
         let result = sqlx::query("DELETE FROM build_metrics WHERE project_name = $1")
             .bind(project_name)
@@ -402,7 +394,7 @@ impl BuildMetricsService {
 
         if !keys.is_empty() {
             let key_count = keys.len();
-            for key in keys {
+            for key in &keys {
                 let _: () = conn.del(&key).await?;
             }
             debug!(project = %project_name, count = key_count, "Invalidated project cache");
@@ -416,16 +408,6 @@ impl BuildMetricsService {
 // ---------------------------------------------------------------------------
 // MetricsExporter
 // ---------------------------------------------------------------------------
-
-// SystemMetrics + MetricsExporter
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SystemMetrics {
-    pub cpu_usage: f64,
-    pub memory_usage: u64,
-    pub uptime: u64,
-    pub timestamp: DateTime<Utc>,
-}
 
 pub struct MetricsExporter {
     current_metrics: Arc<RwLock<SystemMetrics>>,

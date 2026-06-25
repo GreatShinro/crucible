@@ -19,10 +19,6 @@ use crate::services::{
         ContractBenchmarkError, ContractBenchmarkReport, ContractBenchmarkRequest,
         ContractBenchmarkService,
     },
-    error_recovery::ErrorManager,
-    log_aggregator::LogAggregator,
-    sys_metrics::MetricsExporter,
-    tracing::TracingService,
 };
 
 pub struct AppState {
@@ -119,7 +115,7 @@ pub async fn get_system_status(State(state): State<Arc<AppState>>) -> ApiRespons
         uptime_secs: metrics.uptime,
         memory_used_bytes: metrics.memory_usage,
         active_recovery_tasks: recovery_tasks.len(),
-    })
+    }))
 }
 
 #[instrument(skip_all)]

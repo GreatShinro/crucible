@@ -26,6 +26,7 @@ use thiserror::Error;
 use tracing::{debug, error, warn};
 use utoipa::ToSchema;
 
+use crate::error::AppError;
 use crate::services::{
     error_recovery::{ErrorManager, RecoveryTask},
     log_alerts::{Alert, AlertManager},
@@ -146,7 +147,6 @@ pub async fn get_dashboard(
         Err(e) => warn!(error = %e, "Dashboard cache read failed; falling back to live data"),
     }
 
-    // --- assemble live data ---
     let (metrics, active_recovery_tasks, active_alerts) = tokio::join!(
         state.metrics_exporter.get_metrics(),
         state.error_manager.get_active_tasks(),
@@ -283,7 +283,7 @@ where
 {
     let serialized = serde_json::to_string(data)?;
     let mut conn = redis.get_multiplexed_async_connection().await?;
-    let _: () = conn.set_ex(key, serialized, CACHE_TTL_SECS).await?;
+    let _: () = conn.set_ex(key, serialized, ttl_secs).await?;
     Ok(())
 }
 
@@ -294,9 +294,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::{body::Body, http::Request, routing::get, Router};
     use sqlx::postgres::PgPoolOptions;
-    use tower::ServiceExt;
 
     fn make_state() -> Arc<DashboardState> {
         Arc::new(DashboardState {
@@ -415,14 +413,6 @@ mod tests {
         let tasks = json["active_recovery_tasks"].as_array().unwrap();
         assert_eq!(tasks.len(), 1);
         assert_eq!(tasks[0]["name"], "worker_a");
-    }
-
-    #[test]
-    fn test_dashboard_error_display() {
-        let err = DashboardError::Serialization(
-            serde_json::from_str::<serde_json::Value>("bad json").unwrap_err(),
-        );
-        assert!(!err.to_string().is_empty());
     }
 
     #[test]

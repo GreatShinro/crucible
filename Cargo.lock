@@ -451,6 +451,7 @@ dependencies = [
  "opentelemetry-semantic-conventions",
  "opentelemetry_sdk",
  "redis",
+ "regex",
  "reqwest",
  "rust_decimal",
  "rust_decimal_macros",

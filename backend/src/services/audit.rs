@@ -1,8 +1,7 @@
 //! Audit logging service and HTTP routes.
 
 use axum::{
-    extract::{Path, Query, State},
-    response::IntoResponse,
+    extract::{Path, Query},
     routing::{get, post},
     Json, Router,
 };

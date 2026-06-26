@@ -210,6 +210,16 @@ impl MockEnv {
         self.inner.mock_all_auths();
     }
 
+    /// Set explicit mock authorizations for subsequent contract calls.
+    ///
+    /// Unlike [`mock_all_auths`](Self::mock_all_auths), this authorizes only the
+    /// invocations described by the supplied entries. Passing an empty slice
+    /// clears all mocked authorizations so that `require_auth()` calls fail —
+    /// useful for negative authorization tests.
+    pub fn mock_auths(&self, auths: &[soroban_sdk::testutils::MockAuth<'_>]) {
+        self.inner.mock_auths(auths);
+    }
+
     /// Advance the ledger timestamp by a duration.
     pub fn advance_time(&self, duration: Duration) {
         let info = self.inner.ledger().get();

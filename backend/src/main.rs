@@ -35,7 +35,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::signal;
 use tower_http::{
-    cors::{Any, CorsLayer},
+    cors::{AllowOrigin, Any, CorsLayer},
     trace::TraceLayer,
 };
 use tracing::info_span;
@@ -156,10 +156,7 @@ async fn main() -> Result<(), anyhow::Error> {
         )
         .route("/logs", get(backend::api::handlers::admin::get_admin_logs));
 
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    let cors = build_cors_layer(&config);
 
     let app = Router::new()
         .route("/", get(|| async { "Crucible Backend API" }))
@@ -284,5 +281,28 @@ async fn shutdown_signal() {
     tokio::select! {
         _ = ctrl_c => tracing::info!("Received Ctrl+C, initiating graceful shutdown"),
         _ = terminate => tracing::info!("Received SIGTERM, initiating graceful shutdown"),
+    }
+}
+
+fn build_cors_layer(config: &AppConfig) -> CorsLayer {
+    if config.cors.allowed_origins.contains(&"*".to_string()) {
+        CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(Any)
+            .allow_headers(Any)
+    } else {
+        let origins: Vec<axum::http::HeaderValue> = config
+            .cors
+            .allowed_origins
+            .iter()
+            .map(|o| {
+                o.parse()
+                    .unwrap_or_else(|_| panic!("Invalid CORS origin: {}", o))
+            })
+            .collect();
+        CorsLayer::new()
+            .allow_origin(AllowOrigin::list(origins))
+            .allow_methods(Any)
+            .allow_headers(Any)
     }
 }

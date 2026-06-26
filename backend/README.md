@@ -193,7 +193,31 @@ backend/
 | `REDIS_PASSWORD`          | `crucible_redis_secret`     | Redis authentication password            |
 | `REDIS_POOL_SIZE`         | `5`                         | Redis connection pool size               |
 | `JWT_SECRET`              | *(dev default)*             | JWT signing secret                       |
-| `CORS_ALLOWED_ORIGINS`    | `localhost:3000,5173`       | Comma-separated allowed origins          |
+| `APP_CORS__ALLOWED_ORIGINS__0` | *(none)*               | Allowed CORS origin (use `__0`, `__1`, etc. for multiple) |
+
+### CORS Behavior per Environment
+
+CORS configuration is driven by `cors.allowed_origins` in the config system. The behavior changes with the environment:
+
+| Environment   | Default `allowed_origins` | Wildcard `*` allowed? | Behavior                                      |
+|---------------|---------------------------|------------------------|-----------------------------------------------|
+| Development   | `["*"]`                   | Yes                    | Permissive CORS — any origin, method, header  |
+| Staging       | `[]`                      | **No** (rejected)      | Must set explicit origins or startup fails    |
+| Production    | `[]`                      | **No** (rejected)      | Must set explicit origins or startup fails    |
+
+**Setting origins via environment variables:**
+
+Use indexed keys with the `APP__` prefix. The `config` crate maps `APP_CORS__ALLOWED_ORIGINS__N` to `cors.allowed_origins[N]`:
+
+```
+APP_CORS__ALLOWED_ORIGINS__0=https://app.example.com
+APP_CORS__ALLOWED_ORIGINS__1=https://admin.example.com
+```
+
+**Startup validation:**
+In Production or Staging, the application refuses to start if `allowed_origins` is empty or contains the wildcard `"*"`. The error message directs you to set explicit origins.
+
+**SEP-1 exception:** The `/.well-known/stellar.toml` endpoint always returns `Access-Control-Allow-Origin: *` — this is required by the Stellar protocol for wallet discovery and is independent of the application CORS configuration.
 
 ## Docker Compose Features
 
@@ -321,7 +345,7 @@ For production, update the following:
 2. **Set `APP_ENV=production`**
 3. **Set `RUST_LOG=crucible_backend=info,tower_http=info`** — reduce log verbosity
 4. **Set a strong `JWT_SECRET`** — at least 64 characters
-5. **Restrict `CORS_ALLOWED_ORIGINS`** — to your frontend domain(s)
+5. **Set explicit `APP_CORS__ALLOWED_ORIGINS__0`** — to your frontend domain(s). Wildcard `*` is rejected in production.
 6. **Consider external managed databases** — for PostgreSQL and Redis at scale
 7. **Add TLS termination** — via a reverse proxy (nginx, Caddy, or cloud LB)
 

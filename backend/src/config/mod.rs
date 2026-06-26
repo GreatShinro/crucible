@@ -12,6 +12,7 @@ use config::{Config, Environment as ConfigEnvironment, File, FileFormat};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
+pub mod cors;
 pub mod database;
 pub mod error;
 pub mod observability;
@@ -22,6 +23,7 @@ pub mod server;
 #[cfg(test)]
 mod tests;
 
+pub use cors::CorsConfig;
 pub use database::DatabaseConfig;
 pub use error::ConfigError;
 pub use observability::ObservabilityConfig;
@@ -94,6 +96,8 @@ pub struct AppConfig {
     pub database: DatabaseConfig,
     pub redis: RedisConfig,
     pub observability: ObservabilityConfig,
+    #[serde(default)]
+    pub cors: CorsConfig,
 }
 
 // Temporary fallback for testing/reloading if missing in main.rs
@@ -164,6 +168,22 @@ impl AppConfig {
 
         if self.redis.pool_size == 0 {
             errors.push("Redis pool_size must be greater than 0.".to_string());
+        }
+
+        if env == Environment::Production || env == Environment::Staging {
+            if self.cors.allowed_origins.is_empty() {
+                errors.push(
+                    "CORS allowed_origins must not be empty in Production/Staging. \
+                     Set explicit origins (e.g. APP_CORS__ALLOWED_ORIGINS__0=https://example.com)."
+                        .to_string(),
+                );
+            } else if self.cors.allowed_origins.contains(&"*".to_string()) {
+                errors.push(
+                    "CORS wildcard '*' is not allowed in Production/Staging. \
+                     Replace with explicit origins (e.g. APP_CORS__ALLOWED_ORIGINS__0=https://example.com)."
+                        .to_string(),
+                );
+            }
         }
 
         if !errors.is_empty() {

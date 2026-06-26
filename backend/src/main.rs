@@ -10,7 +10,7 @@ use axum::{
 use backend::api::handlers::dashboard::get_dashboard;
 use backend::api::handlers::ws::ws_dashboard_handler;
 use backend::{
-    api::handlers::{dashboard, errors, profiling, sandbox, stellar},
+    api::handlers::{contracts, dashboard, errors, profiling, sandbox, stellar},
     api::middleware::logging::logging_middleware,
     app_state::{build_application_states, ApplicationStates, SharedServices},
     config::{
@@ -132,13 +132,29 @@ async fn main() -> Result<(), anyhow::Error> {
             (name = "profiling", description = "Performance and health monitoring endpoints"),
             (name = "dashboard", description = "Dashboard metrics and analytics endpoints")
         )
-        .route("/compliance-check", post(contracts::check_compliance))
+    )]
+    struct ApiDoc;
+
+    let contracts_router = Router::new()
+        .route("/compile", post(contracts::compile_contract))
+        .route(
+            "/analyze-dependencies",
+            post(contracts::analyze_dependencies),
+        )
+        .route(
+            "/compliance-check",
+            post(contracts::check_compliance),
+        )
         .route(
             "/logs",
             post(contracts::log_contract_call).get(contracts::get_contract_logs),
         )
-        .route("/upgrade-plan", post(contracts::create_upgrade_plan))
-        .route("/templates", get(contracts::get_templates));
+        .route(
+            "/upgrade-plan",
+            post(contracts::create_upgrade_plan),
+        )
+        .route("/templates", get(contracts::get_templates))
+        .with_state(profiling_state.clone());
 
     let coverage_router = Router::new()
         .route("/", post(coverage::submit_coverage))
@@ -190,46 +206,13 @@ async fn main() -> Result<(), anyhow::Error> {
                 .with_state(dashboard_state.clone()),
         )
         .nest("/api/v1/audit", audit::routes(audit_service))
-        .nest(
-            "/api/v1/contracts",
-            Router::new()
-                .route("/compile", post(backend::api::handlers::contracts::compile_contract))
-                .route(
-                    "/analyze-dependencies",
-                    post(backend::api::handlers::contracts::analyze_dependencies),
-                )
-                .route(
-                    "/compliance-check",
-                    post(backend::api::handlers::contracts::check_compliance),
-                )
-                .route(
-                    "/logs",
-                    post(backend::api::handlers::contracts::log_contract_call)
-                        .get(backend::api::handlers::contracts::get_contract_logs),
-                )
-                .route(
-                    "/upgrade-plan",
-                    post(backend::api::handlers::contracts::create_upgrade_plan),
-                )
-                .route("/templates", get(backend::api::handlers::contracts::get_templates))
-                .with_state(profiling_state.clone()),
-        )
-        .route("/api/v1/networks", get(backend::api::handlers::contracts::get_networks))
-        .nest(
-            "/api/v1/admin",
-            Router::new()
-                .route("/system-stats", get(backend::api::handlers::admin::get_system_stats))
-                .route("/maintenance", post(backend::api::handlers::admin::set_maintenance_mode))
-                .route("/logs", get(backend::api::handlers::admin::get_admin_logs))
-                .with_state(profiling_state.clone()),
-        )
+        .nest("/api/v1/contracts", contracts_router)
+        .route("/api/v1/networks", get(contracts::get_networks))
+        .nest("/api/v1/admin", admin_router)
         .nest(
             "/api/v1/errors",
             errors::error_analytics_routes(db_pool.clone(), redis_client.clone()),
         )
-        .nest("/api/v1/contracts", contracts_router)
-        .route("/api/v1/networks", get(contracts::get_networks))
-        .nest("/api/v1/admin", admin_router)
         .nest("/api/v1/sandbox", sandbox::routes(sandbox_service))
         .nest(
             "/api/v1/coverage",

@@ -8,7 +8,7 @@
 //! - [`AppConfig`] — hot-reloadable runtime configuration, loaded via the layered config crate.
 //! - [`reload`] — [`ConfigManager`] and Axum handlers for live config updates.
 
-use config::{Config, Environment as ConfigEnvironment, File, FileFormat};
+use config::{Config as ConfigBuilder, Environment as ConfigEnvironment, File, FileFormat};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -32,8 +32,6 @@ pub use redis::RedisConfig;
 pub use sanitize::{sanitize, SanitizedConfig};
 pub use server::ServerConfig;
 
-use config::{Config as ConfigBuilder, Environment as ConfigEnvironment, File, FileFormat};
-use serde::{Deserialize, Serialize};
 
 /// The execution environment of the application.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]

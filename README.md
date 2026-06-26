@@ -92,7 +92,7 @@ soroban-sdk = { version = "21", features = ["testutils"] }
 
 Enable the `testutils` feature on `soroban-sdk`. crucible depends on it at compile time and will emit a clear error if it is missing.
 
-> **MSRV:** Rust 1.76 or later. crucible tracks the same minimum supported Rust version as `soroban-sdk`.
+> **MSRV:** Rust 1.91.0 or later. crucible tracks the same minimum supported Rust version as `soroban-sdk`.
 
 ---
 

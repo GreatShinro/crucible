@@ -56,25 +56,17 @@ impl CostReport {
     pub fn report(&self) -> String {
         let instructions_str = format_with_commas(self.instructions);
         let memory_str = format_with_commas(self.memory);
-
-        let source_suffix = if self.uses_sdk_fee_estimate() {
-            " (SDK)"
-        } else {
-            ""
-        };
-        let fee_str = format!("{} str{}", self.fee_stroops(), source_suffix);
-
+        let fee_str = format!("{} str", self.fee_stroops());
+        let source = if self.uses_sdk_fee_estimate() { "SDK" } else { "heuristic" };
         let mut output = String::new();
-        output.push_str("+---------------------+---------------------+\n");
-        output.push_str("| Metric              | Value               |\n");
-        output.push_str("+---------------------+---------------------+\n");
-        output.push_str(&format!(
-            "| Instructions        | {:>19} |\n",
-            instructions_str
-        ));
-        output.push_str(&format!("| Memory (bytes)      | {:>19} |\n", memory_str));
-        output.push_str(&format!("| Estimated fee       | {:>19} |\n", fee_str));
-        output.push_str("+---------------------+---------------------+");
+        output.push_str("+---------------------+-----------+\n");
+        output.push_str("| Metric              | Value     |\n");
+        output.push_str("+---------------------+-----------+\n");
+        output.push_str(&format!("| Instructions        | {:>9} |\n", instructions_str));
+        output.push_str(&format!("| Memory (bytes)      | {:>9} |\n", memory_str));
+        output.push_str(&format!("| Estimated fee       | {:>9} |\n", fee_str));
+        output.push_str(&format!("| Fee source          | {:>9} |\n", source));
+        output.push_str("+---------------------+-----------+");
         output
     }
 

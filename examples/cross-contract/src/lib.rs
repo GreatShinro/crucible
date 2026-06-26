@@ -10,7 +10,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractclient, contractimpl, contracttype, symbol_short, token, Address, Env,
+    contract, contractimpl, contracttype, symbol_short, token, Address, Env,
 };
 
 // ---------------------------------------------------------------------------
@@ -62,13 +62,6 @@ impl Counter {
 enum RouterKey {
     Counter,
     Token,
-}
-
-/// Client interface for calling `Counter` from another contract.
-#[contractclient(name = "CounterClient")]
-pub trait CounterInterface {
-    fn increment(env: Env) -> u32;
-    fn get(env: Env) -> u32;
 }
 
 /// A router contract that orchestrates calls to `Counter` and a token.
@@ -128,15 +121,6 @@ impl Router {
 enum AggKey {
     Router,
     TotalRouted,
-}
-
-/// Client interface for calling `Router` from another contract.
-#[contractclient(name = "RouterClient")]
-pub trait RouterInterface {
-    fn initialize(env: Env, counter: Address, token: Address);
-    fn ping_counter(env: Env) -> u32;
-    fn route_transfer(env: Env, from: Address, to: Address, amount: i128);
-    fn counter_value(env: Env) -> u32;
 }
 
 /// An aggregator that calls `Router`, forming a two-level call chain:

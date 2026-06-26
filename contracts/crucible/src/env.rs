@@ -109,6 +109,27 @@ impl Stroops {
 }
 
 /// A wrapper around the Soroban test environment with additional helpers.
+///
+/// # Clone Semantics
+///
+/// `MockEnv` derives [`Clone`] and cloning creates a **shared handle**, not an
+/// independent copy. The following fields are shared via [`Rc`]`<`[`RefCell`]`<...>>`
+/// and mutations through one clone are visible through all clones:
+///
+/// | Shared field | Type | Effect |
+/// |---|---|
+/// | `accounts` | `Rc<RefCell<HashMap<String, Address>>>` | Named account registry |
+/// | `contract_ids` | `Rc<RefCell<HashMap<String, Address>>>` | Contract-type registry |
+/// | `xlm_token_address` | `Rc<RefCell<Option<Address>>>` | Cached XLM token address |
+///
+/// The underlying [`Env`] (`inner`) is also cloned. In Soroban's test environment
+/// the clone shares internal state, so ledger mutations, contract data, etc. are
+/// visible across all clones as well.
+///
+/// The only independent field after a clone is `track_costs: bool`, which is a
+/// plain `Copy` value.
+///
+/// If you need a fully independent copy, use [`MockEnv::fork`].
 #[derive(Clone)]
 pub struct MockEnv {
     inner: Env,
@@ -427,6 +448,27 @@ impl MockEnv {
             Some(Box::new(f)),
         )
     }
+
+    /// Creates a fully independent copy of this environment.
+    ///
+    /// Unlike [`Clone`], `fork` deep-copies the shared [`Rc`]`<`[`RefCell`]`<...>>`
+    /// fields so that mutations in the fork are **not** visible in the original
+    /// (and vice versa).
+    ///
+    /// The underlying [`Env`] is also cloned. In Soroban's test environment, this
+    /// creates a new handle that shares state with the original — there is no
+    /// built-in way to fully isolate ledger state in the Soroban SDK test utils.
+    /// Use `fork` when you want independent account/contract registries while
+    /// working within the same Soroban ledger.
+    pub fn fork(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            accounts: Rc::new(RefCell::new(self.accounts.borrow().clone())),
+            contract_ids: Rc::new(RefCell::new(self.contract_ids.borrow().clone())),
+            xlm_token_address: Rc::new(RefCell::new(self.xlm_token_address.borrow().clone())),
+            track_costs: self.track_costs,
+        }
+    }
 }
 
 impl Default for MockEnv {
@@ -585,5 +627,128 @@ impl MockEnvBuilder {
                 .build();
         }
         self.env
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use soroban_sdk::testutils::Address as _;
+
+    #[test]
+    fn test_clone_shares_accounts() {
+        let env = MockEnv::builder()
+            .with_account("alice", Stroops::xlm(100))
+            .build();
+        let env2 = env.clone();
+
+        let bob = Address::generate(&env.inner);
+        env2.register_account("bob", bob);
+
+        assert!(env.accounts.borrow().contains_key("bob"));
+    }
+
+    #[test]
+    fn test_clone_shares_contract_ids() {
+        let env = MockEnv::default();
+        let env2 = env.clone();
+
+        let addr = Address::generate(&env.inner);
+        env2.register_contract::<MockEnv>(addr.clone());
+
+        assert_eq!(env.contract_id::<MockEnv>(), addr);
+    }
+
+    #[test]
+    fn test_clone_shares_xlm_token_address() {
+        let env = MockEnv::default();
+        let env2 = env.clone();
+
+        let addr = Address::generate(&env.inner);
+        env2.set_xlm_token_address(addr.clone());
+
+        assert_eq!(env.xlm_token_address(), Some(addr));
+    }
+
+    #[test]
+    fn test_clone_independent_track_costs() {
+        let mut env = MockEnv::default();
+        env.track_costs = true;
+        let env2 = env.clone();
+
+        assert!(env2.track_costs);
+
+        env.track_costs = false;
+        assert!(env2.track_costs);
+    }
+
+    #[test]
+    fn test_fork_creates_independent_accounts() {
+        let env = MockEnv::builder()
+            .with_account("alice", Stroops::xlm(100))
+            .build();
+        let forked = env.fork();
+
+        assert!(forked.accounts.borrow().contains_key("alice"));
+
+        let bob = Address::generate(&env.inner);
+        forked.register_account("bob", bob);
+
+        assert!(!env.accounts.borrow().contains_key("bob"));
+    }
+
+    #[test]
+    fn test_fork_creates_independent_contract_ids() {
+        let env = MockEnv::default();
+        let addr = Address::generate(&env.inner);
+        env.register_contract::<MockEnv>(addr.clone());
+
+        let forked = env.fork();
+
+        assert_eq!(forked.contract_id::<MockEnv>(), addr);
+
+        let addr2 = Address::generate(&env.inner);
+        forked.register_contract::<MockEnv>(addr2.clone());
+
+        assert_ne!(env.contract_id::<MockEnv>(), addr2);
+    }
+
+    #[test]
+    fn test_fork_creates_independent_xlm_token_address() {
+        let env = MockEnv::default();
+        let addr = Address::generate(&env.inner);
+        env.set_xlm_token_address(addr.clone());
+
+        let forked = env.fork();
+
+        assert_eq!(forked.xlm_token_address(), Some(addr));
+
+        forked.set_xlm_token_address(Address::generate(&env.inner));
+        assert_ne!(
+            forked.xlm_token_address(),
+            env.xlm_token_address(),
+            "forked and original xlm token addresses should differ"
+        );
+    }
+
+    #[test]
+    fn test_clone_and_fork_work_with_account_handle() {
+        let env = MockEnv::builder()
+            .with_account("alice", Stroops::xlm(100))
+            .build();
+
+        let alice = env.account("alice");
+        alice.xlm_balance();
+    }
+
+    #[test]
+    fn test_clone_shared_accounts_visible_through_account_handle() {
+        let env1 = MockEnv::builder()
+            .with_account("alice", Stroops::xlm(100))
+            .build();
+        let env2 = env1.clone();
+
+        let alice = env2.account("alice");
+        assert_eq!(alice.xlm_balance(), Stroops::xlm(100).as_stroops());
     }
 }

@@ -156,7 +156,18 @@ impl CostReport {
             .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
             .unwrap_or(false);
 
-        if !snap_path.exists() || update {
+        if !snap_path.exists() {
+            if !update {
+                panic!(
+                    "missing cost snapshot '{}' at {}\n\
+                     Run with CRUCIBLE_UPDATE_SNAPSHOTS=1 to create it.",
+                    name,
+                    snap_path.display()
+                );
+            }
+        }
+
+        if update {
             fs::create_dir_all(&snap_dir)
                 .unwrap_or_else(|e| panic!("failed to create snapshot dir: {}", e));
 
@@ -171,11 +182,7 @@ impl CostReport {
             fs::write(&snap_path, json)
                 .unwrap_or_else(|e| panic!("failed to write snapshot: {}", e));
 
-            if update {
-                eprintln!("[crucible] updated snapshot '{}'", name);
-            } else {
-                eprintln!("[crucible] wrote new snapshot '{}'", name);
-            }
+            eprintln!("[crucible] updated snapshot '{}'", name);
             return;
         }
 

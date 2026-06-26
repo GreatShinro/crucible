@@ -10,7 +10,7 @@ use axum::{
 use backend::api::handlers::dashboard::get_dashboard;
 use backend::api::handlers::ws::ws_dashboard_handler;
 use backend::{
-    api::handlers::{dashboard, errors, profiling, sandbox, stellar},
+    api::handlers::{dashboard, errors, health, profiling, sandbox, stellar},
     api::middleware::logging::logging_middleware,
     app_state::{build_application_states, ApplicationStates, SharedServices},
     config::{
@@ -93,6 +93,15 @@ async fn main() -> Result<(), anyhow::Error> {
         .backend(storage)
         .build_fn(monitor_transaction);
 
+    let health_cache = ConnectionManager::new(redis_client.clone()).await?;
+    let health_queue = ConnectionManager::new(redis_client.clone()).await?;
+
+    let health_state = health::HealthState {
+        db: db_pool.clone(),
+        cache: health_cache,
+        queue: health_queue,
+    };
+
     let shared_services = SharedServices {
         metrics_exporter,
         error_manager,
@@ -163,6 +172,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let app = Router::new()
         .route("/", get(|| async { "Crucible Backend API" }))
+        .nest("/health", health::router().with_state(health_state))
         .route("/.well-known/stellar.toml", get(stellar::get_stellar_toml))
         .merge(
             Router::new()

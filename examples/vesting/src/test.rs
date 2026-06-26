@@ -29,7 +29,8 @@ struct Ctx {
 }
 
 impl Ctx {
-    fn setup() -> Self {
+    /// Build the environment and deploy the contract *without* initializing it.
+    fn build() -> Self {
         let env = MockEnv::builder()
             .at_timestamp(BASE_TIME)
             .with_contract::<Vesting>()
@@ -44,20 +45,6 @@ impl Ctx {
         let token = MockToken::new(&env, "VEST", 7);
         token.mint(&admin, TOTAL);
 
-        // Initialize the vesting schedule. mock_all_auths() is needed for:
-        //   - admin.require_auth() inside initialize()
-        //   - token.transfer(admin, contract, total) inside initialize()
-        env.mock_all_auths();
-        VestingClient::new(env.inner(), &id).initialize(
-            &admin,
-            &beneficiary,
-            &token.address(),
-            &TOTAL,
-            &BASE_TIME,
-            &Duration::days(CLIFF_DAYS).as_seconds(),
-            &Duration::days(VEST_DAYS).as_seconds(),
-        );
-
         Ctx {
             env,
             id,
@@ -67,13 +54,31 @@ impl Ctx {
         }
     }
 
+    /// Full happy-path setup: build + initialize.
+    fn setup() -> Self {
+        let ctx = Self::build();
+
+        ctx.env.mock_all_auths();
+        VestingClient::new(ctx.env.inner(), &ctx.id).initialize(
+            &ctx.admin,
+            &ctx.beneficiary,
+            &ctx.token.address(),
+            &TOTAL,
+            &BASE_TIME,
+            &Duration::days(CLIFF_DAYS).as_seconds(),
+            &Duration::days(VEST_DAYS).as_seconds(),
+        );
+
+        ctx
+    }
+
     fn client(&self) -> VestingClient<'_> {
         VestingClient::new(self.env.inner(), &self.id)
     }
 }
 
 // ---------------------------------------------------------------------------
-// Tests
+// Existing Tests
 // ---------------------------------------------------------------------------
 
 #[test]

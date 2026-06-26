@@ -49,7 +49,8 @@ pub struct Vesting;
 impl Vesting {
     /// Initialise the vesting schedule.
     ///
-    /// Transfers `total` tokens from `admin` into this contract.
+    /// Validates all parameters before transferring `total` tokens from `admin`
+    /// into this contract. Reverts on invalid schedules so no funds move.
     #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         env: Env,
@@ -70,6 +71,7 @@ impl Vesting {
         });
 
         token::Client::new(&env, &token).transfer(&admin, env.current_contract_address(), &total);
+
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(
             &DataKey::Schedule,
@@ -118,7 +120,7 @@ impl Vesting {
         }
         s.claimed += claimable;
         env.storage().instance().set(&DataKey::Schedule, &s);
-        token::Client::new(&env, &s.token).transfer(
+        token::TokenClient::new(&env, &s.token).transfer(
             &env.current_contract_address(),
             &s.beneficiary,
             &claimable,
@@ -140,7 +142,7 @@ impl Vesting {
         s.revoked = true;
         env.storage().instance().set(&DataKey::Schedule, &s);
         if unvested > 0 {
-            token::Client::new(&env, &s.token).transfer(
+            token::TokenClient::new(&env, &s.token).transfer(
                 &env.current_contract_address(),
                 &admin,
                 &unvested,

@@ -7,8 +7,8 @@ mod tests {
     fn test_simulation_panic_capture() {
         let sim: SimulatedTx<()> = SimulatedTx { 
             result: SimulationResult::Failure(SimulationError::Panic { payload: "boom".into() }),
-            fee: 0,
-            instructions: 0,
+            fee: 100,
+            instructions: 10,
         };
         assert!(!sim.would_succeed());
     }

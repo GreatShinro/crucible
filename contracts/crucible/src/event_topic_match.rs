@@ -1,11 +1,17 @@
 // Shared helpers for matching Soroban event topics.
 //
 // NOTE: This module exists to ensure all public event-filtering helpers use the
-// same topic comparison strategy (payload equality, not debug-string matching).
+// same topic comparison strategy. Comparison is done via the host environment's
+// structural equality (`Env::compare`), not raw payload bits, since object-backed
+// values (String, Bytes, Vec, Map, Address, structs/enums) are represented as
+// handles into the host's object store — two semantically-equal values can have
+// different payloads, so `Val::get_payload()` comparison silently fails to match.
 
+use soroban_sdk::testutils::Compare;
 use soroban_sdk::{Env, Val, Vec as SorobanVec};
 
-pub(crate) fn topics_match_by_payload(
+pub(crate) fn topics_match(
+    env: &Env,
     filter_topics: &SorobanVec<Val>,
     event_topics: &SorobanVec<Val>,
 ) -> bool {
@@ -14,8 +20,7 @@ pub(crate) fn topics_match_by_payload(
     }
 
     filter_topics.iter().enumerate().all(|(i, filter_topic)| {
-        // Val doesn't implement PartialEq; compare raw bit payloads.
         let ev_topic = event_topics.get(i as u32).unwrap();
-        filter_topic.get_payload() == ev_topic.get_payload()
+        env.compare(&filter_topic, &ev_topic) == Ok(core::cmp::Ordering::Equal)
     })
 }
